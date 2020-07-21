@@ -18,12 +18,35 @@
 
   Resources:
     #instace profile contains the IAM Role name(s) that we want to associate to our auto scaling EC2 Servers
-    ProfileWithRolesForOurApp:
-      Type: AWS::IAM::InstanceProfile
-      Properties: 
-        Roles:
-          - UdacityS3ReadOnlyEC2
+    S3GetIAMRole:
+      Type: 'AWS::IAM::Role'
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: 'Allow'
+              Principal:
+                Service:
+                  - 'ec2.amazonaws.com'
+              Action:
+                - 'sts:AssumeRole'
+        Path: '/'
+        Policies:
+          - PolicyName: S3GetPolicy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: 'Allow'
+                  Action: 's3:Get*'
+                  Resource: '*'
     
+    S3GetInstanceProfile:
+      Type: 'AWS::IAM::InstanceProfile'
+      Properties:
+        Path: '/'
+        Roles:
+          - Ref: 'S3GetIAMRole'
+
     LBSecGroup:
       Type: AWS::EC2::SecurityGroup
       Properties:
@@ -46,7 +69,9 @@
       Type: AWS::EC2::SecurityGroup
       Properties:
         GroupDescription: Allow HTTP and SSH in, unrestricted outbound access
-        VpcId: !Ref VPC
+        VpcId:
+          Fn::ImportValue:
+            !Sub "${EnvironmentName}-VPCID"
         SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -55,7 +80,7 @@
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 0.0.0.0/0
+          CidrIp: !Ref SSHLocation
         SecurityGroupEgress:
         - IpProtocol: tcp
           FromPort: 0
@@ -83,8 +108,7 @@
         - DeviceName: "/dev/sdk"
           Ebs:
             VolumeSize: '10'
-        IamInstanceProfile:
-          Ref: "ProfileWithRolesForOurApp"
+        IamInstanceProfile: !Ref S3GetInstanceProfile
     
     WebAppGroup:
       Type: AWS::AutoScaling::AutoScalingGroup
@@ -108,43 +132,43 @@
         SecurityGroups:
         - Ref: LBSecGroup
 
-      Listener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      DefaultActions:
-      - Type: forward
-        TargetGroupArn:
-          Ref: WebAppTargetGroup
-      LoadBalancerArn: !Ref WebAppLB
-      Port: '80'
-      Protocol: HTTP
+    Listener:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties:
+        DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            Ref: WebAppTargetGroup
+        LoadBalancerArn: !Ref WebAppLB
+        Port: '80'
+        Protocol: HTTP
 
-  ALBListenerRule:
-    Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    Properties:
-      Actions:
-      - Type: forward
-        TargetGroupArn: !Ref 'WebAppTargetGroup'
-      Conditions:
-      - Field: path-pattern
-        Values: [/]
-      ListenerArn: !Ref 'Listener'
-      Priority: 1
+    ALBListenerRule:
+      Type: AWS::ElasticLoadBalancingV2::ListenerRule
+      Properties:
+        Actions:
+        - Type: forward
+          TargetGroupArn: !Ref 'WebAppTargetGroup'
+        Conditions:
+        - Field: path-pattern
+          Values: [/]
+        ListenerArn: !Ref 'Listener'
+        Priority: 1
 
-  WebAppTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      HealthCheckIntervalSeconds: 12
-      HealthCheckPath: /
-      HealthCheckProtocol: HTTP
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 2
-      Port: 80
-      Protocol: HTTP
-      UnhealthyThresholdCount: 5
-      VpcId:
-        Fn::ImportValue:
-          Fn::Sub: "${EnvironmentName}-VPCID"
+    WebAppTargetGroup:
+      Type: AWS::ElasticLoadBalancingV2::TargetGroup
+      Properties:
+        HealthCheckIntervalSeconds: 12
+        HealthCheckPath: /
+        HealthCheckProtocol: HTTP
+        HealthCheckTimeoutSeconds: 5
+        HealthyThresholdCount: 2
+        Port: 80
+        Protocol: HTTP
+        UnhealthyThresholdCount: 5
+        VpcId:
+          Fn::ImportValue:
+            Fn::Sub: "${EnvironmentName}-VPCID"
           
   Outputs:
     LoadBalancerDNS:
