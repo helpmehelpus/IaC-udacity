@@ -27,7 +27,7 @@
       Type: String
       Default: 10.0.2.0/24
 
-    PrivateSubnet2:CIDR:
+    PrivateSubnet2CIDR:
       Description: IP Range for Private subnet 2
       Type: String
       Default: 10.0.3.0/24
@@ -39,7 +39,7 @@
       Properties:
         CidrBlock: !Ref VpcCIDR
         EnableDnsSupport: true
-        EnableDnSHostnames: true
+        EnableDnsHostnames: true
         Tags:
           - Key: Name
             Value: !Ref EnvironmentName
@@ -47,14 +47,15 @@
     InternetGateway:
       Type: AWS::EC2::InternetGateway
       Properties:
-        InternetGatewayId: !Ref InternetGateway
-        VpcId: !Ref VPC
+        Tags:
+          - Key: Name
+            Value: !Ref EnvironmentName
 
     InternetGatewayAttachment:
       Type: AWS::EC2::VPCGatewayAttachment
       Properties:
         InternetGatewayId: !Ref InternetGateway
-        VpcID: !Ref VPC
+        VpcId: !Ref VPC
 
     PublicSubnet1:
       Type: AWS::EC2::Subnet
@@ -70,7 +71,7 @@
     PublicSubnet2:
       Type: AWS::EC2::Subnet
       Properties:
-        VpcID: !Ref VPC
+        VpcId: !Ref VPC
         AvailabilityZone: !Select [1, !GetAZs '']
         CidrBlock: !Ref PublicSubnet2CIDR
         MapPublicIpOnLaunch: false
@@ -119,7 +120,7 @@
         SubnetId: !Ref PublicSubnet1
 
     NatGateway2:
-      Type: AWS::EC2::RouteTable
+      Type: AWS::EC2::NatGateway
       Properties:
         AllocationId: !GetAtt NatGateway2EIP.AllocationId
         SubnetId: !Ref PublicSubnet2
